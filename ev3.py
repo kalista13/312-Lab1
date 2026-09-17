@@ -166,3 +166,118 @@ def rectangle(length_cm, width_cm):
 #straight(100)
 #circle(50)
 rectangle(100, 50)
+
+def lemniscate(a_cm):
+    import math
+    import time
+
+    wheel_diameter = 5.5
+    wheel_distance = 9.1
+
+    # --------------------------------------------------
+    # Lemniscate parameters
+    # x(t) = a sin(t)
+    # y(t) = a sin(t) cos(t)
+    # --------------------------------------------------
+
+    # Maximum motor speed percentage
+    max_motor_percent = 20
+
+    # Number of small time steps
+    steps = 200
+
+    # Go through two arcs of the figure-eight
+    t_start = 0
+    t_end = 2 * math.pi
+
+    dt = (t_end - t_start) / steps
+
+    # --------------------------------------------------
+    # Calculate the curve information
+    # --------------------------------------------------
+
+    for i in range(steps):
+
+        t = t_start + i * dt
+
+        # First derivatives
+        dx = a_cm * math.cos(t)
+
+        dy = a_cm * (math.cos(t) ** 2 - math.sin(t) ** 2)
+
+        # Second derivatives
+        ddx = -a_cm * math.sin(t)
+
+        ddy = -4 * a_cm * math.sin(t) * math.cos(t)
+
+        # --------------------------------------------------
+        # Robot linear velocity
+        # --------------------------------------------------
+
+        speed = math.sqrt(dx ** 2 + dy ** 2)
+
+        # Avoid division by zero
+        if speed == 0:
+            continue
+
+        # --------------------------------------------------
+        # Curvature
+        #
+        # k = (x'y'' - y'x'') /
+        #     (x'^2 + y'^2)^(3/2)
+        # --------------------------------------------------
+
+        curvature = (
+            dx * ddy - dy * ddx
+        ) / (
+            (dx ** 2 + dy ** 2) ** 1.5
+        )
+
+        # --------------------------------------------------
+        # Angular velocity
+        # omega = v * curvature
+        # --------------------------------------------------
+
+        omega = speed * curvature
+
+        # --------------------------------------------------
+        # Differential-drive wheel velocities
+        # --------------------------------------------------
+
+        left_velocity = speed - (wheel_distance / 2) * omega
+        right_velocity = speed + (wheel_distance / 2) * omega
+
+        # --------------------------------------------------
+        # Scale wheel velocities to motor percentages
+        # --------------------------------------------------
+
+        max_velocity = max(
+            abs(left_velocity),
+            abs(right_velocity)
+        )
+
+        left_percent = (
+            left_velocity / max_velocity
+        ) * max_motor_percent
+
+        right_percent = (
+            right_velocity / max_velocity
+        ) * max_motor_percent
+
+        # Your robot currently moves forward with
+        # negative motor percentages.
+        left_percent = -left_percent
+        right_percent = -right_percent
+
+        # --------------------------------------------------
+        # Run motors for this small time step
+        # --------------------------------------------------
+
+        left_motor.on(SpeedPercent(left_percent))
+        right_motor.on(SpeedPercent(right_percent))
+
+        time.sleep(0.05)
+
+    # Stop both motors
+    left_motor.off()
+    right_motor.off()
