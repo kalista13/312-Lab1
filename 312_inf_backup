@@ -164,56 +164,53 @@ def rectangle(length_cm, width_cm):
 
 def lemniscate(a):
     wheel_diameter = 5.5
-    wheel_distance = 9.0
-    d = wheel_distance / 2
+    wheel_distance = 9
+    wheel_radius = wheel_diameter / 2
 
+    t = 0
     dt = 0.05
+    t_speed = 0.35
 
-    # How long the whole figure eight should take
-    total_time = 15.0
+    while t < 2 * math.pi:
 
-    u = 0.0
-    du_dt = (2 * math.pi) / total_time
+        dx = a * math.cos(t)
+        dy = a * math.cos(2 * t)
 
-    while u < 2 * math.pi:
+        ddx = -a * math.sin(t)
+        ddy = -2 * a * math.sin(2 * t)
 
-        # derivatives with respect to u
-        dx = -a * math.sin(u)
-        dy = a * math.cos(2 * u)
+        speed = math.sqrt(dx**2 + dy**2)
 
-        ddx = -a * math.cos(u)
-        ddy = -2 * a * math.sin(2 * u)
-
-        # curvature
         curvature = (
             dx * ddy - dy * ddx
-        ) / (
-            (dx * dx + dy * dy) ** 1.5
-        )
+        ) / (speed**3)
 
-        # actual robot linear speed in cm/s
-        path_speed = math.sqrt(dx * dx + dy * dy) * du_dt
+        v = t_speed * speed
+        omega = v * curvature
 
-        # differential-drive wheel speeds in cm/s
-        left_speed = path_speed * (1 - d * curvature)
-        right_speed = path_speed * (1 + d * curvature)
+        # Make final quarter straighten earlier
+        if t > 3 * math.pi / 2:
+            omega *= 0.6
 
-        # convert cm/s to motor degrees/s
-        wheel_circumference = math.pi * wheel_diameter
+        left_speed = v - (wheel_distance / 2) * omega
+        right_speed = v + (wheel_distance / 2) * omega
 
-        left_dps = left_speed / wheel_circumference * 360
-        right_dps = right_speed / wheel_circumference * 360
+        left_dps = left_speed / wheel_radius * 180 / math.pi
+        right_dps = right_speed / wheel_radius * 180 / math.pi
 
         left_motor.on(SpeedDPS(-left_dps))
         right_motor.on(SpeedDPS(-right_dps))
 
         time.sleep(dt)
 
-        u += du_dt * dt
+        # Shorten the middle straight-ish section
+        if math.pi / 2 < t < math.pi:
+            t += 1.5 * t_speed * dt
+        else:
+            t += t_speed * dt
 
     left_motor.off()
     right_motor.off()
-
 
 #straight_line_error()
 #rotational_error(90)
@@ -221,5 +218,5 @@ def lemniscate(a):
 #straight(100)
 #circle(50)
 #rectangle(100, 50)
-lemniscate(50.0)
-print("testing")
+lemniscate(50)
+print("testing quarter")
