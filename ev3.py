@@ -1,10 +1,20 @@
 #!/usr/bin/env python3
 
-from ev3dev2.motor import LargeMotor, OUTPUT_B, OUTPUT_C, SpeedPercent
+from ev3dev2.motor import LargeMotor, OUTPUT_B, OUTPUT_C, SpeedPercent, SpeedDPS
 import time
+import math
 
 left_motor = LargeMotor(OUTPUT_B)
 right_motor = LargeMotor(OUTPUT_C)
+
+from ev3dev2.sensor.lego import GyroSensor
+from ev3dev2.sensor import INPUT_2
+
+gyro = GyroSensor(INPUT_2)
+gyro.mode = 'GYRO-ANG'
+
+gyro.reset()
+time.sleep(0.1)
 
 
 def straight_line_error():
@@ -30,7 +40,7 @@ def rotational_error(robot_angle):
     right_motor.position = 0
 
     wheel_diameter = 5.5
-    wheel_distance = 9.1
+    wheel_distance = 9
 
     motor_degrees = robot_angle * wheel_distance / wheel_diameter
 
@@ -51,7 +61,7 @@ def circle(radius):
     right_motor.position = 0
 
     wheel_diameter = 5.5
-    wheel_distance = 9.1
+    wheel_distance = 9
 
     d = wheel_distance / 2
 
@@ -102,13 +112,13 @@ def straight(distance_cm):
     motor_degrees = (distance_cm / wheel_circumference) * 360
 
     left_motor.on_for_degrees(
-        SpeedPercent(-20),
+        SpeedPercent(-30),
         motor_degrees,
         block=False
     )
 
     right_motor.on_for_degrees(
-        SpeedPercent(-20),
+        SpeedPercent(-30),
         motor_degrees,
         block=True
     )
@@ -121,18 +131,36 @@ def straight(distance_cm):
 
 def rotate(angle):
     wheel_diameter = 5.5
-    wheel_distance = 9.1
+    wheel_distance = 9
+    gyro_offset = 13
 
-    motor_degrees = angle * wheel_distance / wheel_diameter
+    # Reset gyro for every individual turn
+    gyro.reset()
 
+    # After reset, each turn starts from 0 degrees
+    current_angle = gyro.angle - gyro_offset
+
+    # Amount needed to complete this turn
+    corrected_angle = angle - current_angle
+
+    motor_degrees = abs(corrected_angle) * wheel_distance / wheel_diameter
+
+    if corrected_angle > 0:
+        left_speed = 20
+        right_speed = -20
+    else:
+        left_speed = -20
+        right_speed = 20
+
+    # Main turn
     left_motor.on_for_degrees(
-        SpeedPercent(-20),
+        SpeedPercent(left_speed),
         motor_degrees,
         block=False
     )
 
     right_motor.on_for_degrees(
-        SpeedPercent(20),
+        SpeedPercent(right_speed),
         motor_degrees,
         block=True
     )
@@ -140,144 +168,133 @@ def rotate(angle):
     left_motor.off()
     right_motor.off()
 
+    time.sleep(0.2)
+
+    # Measure error after the turn
+    current_angle = gyro.angle - gyro_offset
+    error = angle - current_angle
+
+    # Correct remaining error
+    if abs(error) > 1:
+
+        correction_degrees = abs(error) * wheel_distance / wheel_diameter
+
+        if error > 0:
+            left_speed = 5
+            right_speed = -5
+        else:
+            left_speed = -5
+            right_speed = 5
+
+        left_motor.on_for_degrees(
+            SpeedPercent(left_speed),
+            correction_degrees,
+            block=False
+        )
+
+        right_motor.on_for_degrees(
+            SpeedPercent(right_speed),
+            correction_degrees,
+            block=True
+        )
+
+        left_motor.off()
+        right_motor.off()
+
+    # Final result for THIS turn only
+    current_angle = gyro.angle - gyro_offset
+    error = angle - current_angle
+
+    print("Target angle:", angle)
+    print("Raw gyro angle:", gyro.angle)
+    print("Corrected gyro angle:", current_angle)
+    print("Final error:", error)
 
 def rectangle(length_cm, width_cm):
+    gyro.reset()
+    time.sleep(1)
     straight(length_cm)
     time.sleep(0.5)
     rotate(90)
     time.sleep(0.5)
 
+    gyro.reset()
+    time.sleep(1)
     straight(width_cm)
     time.sleep(0.5)
     rotate(90)
     time.sleep(0.5)
 
+    gyro.reset()
+    time.sleep(1)
     straight(length_cm)
     time.sleep(0.5)
     rotate(90)
     time.sleep(0.5)
 
+    gyro.reset()
+    time.sleep(1)
     straight(width_cm)
     time.sleep(0.5)
     rotate(90)
+
+def lemniscate(a):
+    wheel_diameter = 5.5
+    wheel_distance = 9
+    wheel_radius = wheel_diameter / 2
+
+    t = 0
+    dt = 0.05
+    t_speed = 0.35
+
+    while t < 2 * math.pi:
+
+        dx = a * math.cos(t)
+        dy = a * math.cos(2 * t)
+
+        ddx = -a * math.sin(t)
+        ddy = -2 * a * math.sin(2 * t)
+
+        speed = math.sqrt(dx**2 + dy**2)
+
+        curvature = (
+            dx * ddy - dy * ddx
+        ) / (speed**3)
+
+        v = t_speed * speed
+        omega = v * curvature
+
+        # Make final quarter straighten earlier
+        if t > 3 * math.pi / 2:
+            omega *= 0.6
+
+        left_speed = v - (wheel_distance / 2) * omega
+        right_speed = v + (wheel_distance / 2) * omega
+
+        left_dps = left_speed / wheel_radius * 180 / math.pi
+        right_dps = right_speed / wheel_radius * 180 / math.pi
+
+        left_motor.on(SpeedDPS(-left_dps))
+        right_motor.on(SpeedDPS(-right_dps))
+
+        time.sleep(dt)
+
+        # Shorten the middle straight-ish section
+        if math.pi / 2 < t < math.pi:
+            t += 1.5 * t_speed * dt
+        else:
+            t += t_speed * dt
+
+    left_motor.off()
+    right_motor.off()
+
 #straight_line_error()
 #rotational_error(90)
 
 #straight(100)
 #circle(50)
-rectangle(100, 50)
+#rectangle(15,15)
+#lemniscate(50)
+#print("testing quarter")
 
-def lemniscate(a_cm):
-    import math
-    import time
-
-    wheel_diameter = 5.5
-    wheel_distance = 9.1
-
-    # --------------------------------------------------
-    # Lemniscate parameters
-    # x(t) = a sin(t)
-    # y(t) = a sin(t) cos(t)
-    # --------------------------------------------------
-
-    # Maximum motor speed percentage
-    max_motor_percent = 20
-
-    # Number of small time steps
-    steps = 200
-
-    # Go through two arcs of the figure-eight
-    t_start = 0
-    t_end = 2 * math.pi
-
-    dt = (t_end - t_start) / steps
-
-    # --------------------------------------------------
-    # Calculate the curve information
-    # --------------------------------------------------
-
-    for i in range(steps):
-
-        t = t_start + i * dt
-
-        # First derivatives
-        dx = a_cm * math.cos(t)
-
-        dy = a_cm * (math.cos(t) ** 2 - math.sin(t) ** 2)
-
-        # Second derivatives
-        ddx = -a_cm * math.sin(t)
-
-        ddy = -4 * a_cm * math.sin(t) * math.cos(t)
-
-        # --------------------------------------------------
-        # Robot linear velocity
-        # --------------------------------------------------
-
-        speed = math.sqrt(dx ** 2 + dy ** 2)
-
-        # Avoid division by zero
-        if speed == 0:
-            continue
-
-        # --------------------------------------------------
-        # Curvature
-        #
-        # k = (x'y'' - y'x'') /
-        #     (x'^2 + y'^2)^(3/2)
-        # --------------------------------------------------
-
-        curvature = (
-            dx * ddy - dy * ddx
-        ) / (
-            (dx ** 2 + dy ** 2) ** 1.5
-        )
-
-        # --------------------------------------------------
-        # Angular velocity
-        # omega = v * curvature
-        # --------------------------------------------------
-
-        omega = speed * curvature
-
-        # --------------------------------------------------
-        # Differential-drive wheel velocities
-        # --------------------------------------------------
-
-        left_velocity = speed - (wheel_distance / 2) * omega
-        right_velocity = speed + (wheel_distance / 2) * omega
-
-        # --------------------------------------------------
-        # Scale wheel velocities to motor percentages
-        # --------------------------------------------------
-
-        max_velocity = max(
-            abs(left_velocity),
-            abs(right_velocity)
-        )
-
-        left_percent = (
-            left_velocity / max_velocity
-        ) * max_motor_percent
-
-        right_percent = (
-            right_velocity / max_velocity
-        ) * max_motor_percent
-
-        # Your robot currently moves forward with
-        # negative motor percentages.
-        left_percent = -left_percent
-        right_percent = -right_percent
-
-        # --------------------------------------------------
-        # Run motors for this small time step
-        # --------------------------------------------------
-
-        left_motor.on(SpeedPercent(left_percent))
-        right_motor.on(SpeedPercent(right_percent))
-
-        time.sleep(0.05)
-
-    # Stop both motors
-    left_motor.off()
-    right_motor.off()
+rotate(180)
