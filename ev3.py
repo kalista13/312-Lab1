@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from ev3dev2.motor import (LargeMotor,OUTPUT_B,OUTPUT_C,SpeedPercent,SpeedDPS)
+from ev3dev2.motor import (LargeMotor,OUTPUT_B,OUTPUT_C,SpeedPercent,SpeedDPS,MoveTank)
 from ev3dev2.sensor.lego import GyroSensor, ColorSensor
 from ev3dev2.sensor import INPUT_1, INPUT_2, INPUT_4
 
@@ -96,6 +96,7 @@ def rotational_error(robot_angle):
 # Target distance: 1 m.
 # --------------------------------------------------
 def straight(distance_cm):
+    robot = MoveTank(OUTPUT_B, OUTPUT_C)
     left_motor.position = 0
     right_motor.position = 0
 
@@ -104,20 +105,7 @@ def straight(distance_cm):
 
     motor_degrees = (distance_cm / wheel_circumference) * 360
 
-    left_motor.on_for_degrees(
-        SpeedPercent(-30),
-        motor_degrees,
-        block=False
-    )
-
-    right_motor.on_for_degrees(
-        SpeedPercent(-30),
-        motor_degrees,
-        block=True
-    )
-
-    left_motor.off()
-    right_motor.off()
+    robot.on_for_degrees(SpeedPercent(-20),SpeedPercent(-20),motor_degrees,brake=True,block=True)
 
     print("Left motor:", left_motor.position, "degrees")
     print("Right motor:", right_motor.position, "degrees")
@@ -134,46 +122,35 @@ def circle(radius):
     right_motor.position = 0
 
     wheel_diameter = 5.5
-    wheel_distance = 9.3
+    wheel_distance = 8.9
 
     d = wheel_distance / 2
 
-    # Choose robot angular speed
-    omega = 0.35
+    left_radius = radius + d
+    right_radius = radius - d
 
-    # Wheel linear speeds from lecture equations
-    left_speed_cm = omega * (radius + d)
-    right_speed_cm = omega * (radius - d)
-
-    # Scale to motor percentages
-    max_speed_cm = max(abs(left_speed_cm), abs(right_speed_cm))
-
-    left_percent = 20 * left_speed_cm / max_speed_cm
-    right_percent = 20 * right_speed_cm / max_speed_cm
+    # Outer wheel at 20%, inner wheel scaled proportionally
+    left_percent = 20
+    right_percent = 20 * right_radius / left_radius
 
     # Distance each wheel travels for one full circle
-    left_distance = 2 * 3.14159 * (radius + d)
-    right_distance = 2 * 3.14159 * (radius - d)
+    left_distance = 2 * 3.14159 * left_radius
+    right_distance = 2 * 3.14159 * right_radius
 
     wheel_circumference = 3.14159 * wheel_diameter
 
     left_degrees = left_distance / wheel_circumference * 360
     right_degrees = right_distance / wheel_circumference * 360
 
-    left_motor.on_for_degrees(
-        SpeedPercent(-left_percent),
-        left_degrees,
-        block=False
-    )
+    robot = MoveTank(OUTPUT_B, OUTPUT_C)
 
-    right_motor.on_for_degrees(
+    robot.on_for_degrees(
+        SpeedPercent(-left_percent),
         SpeedPercent(-right_percent),
-        right_degrees,
+        left_degrees,
+        brake=True,
         block=True
     )
-
-    left_motor.off()
-    right_motor.off()
 #circle(50)
 
 # --------------------------------------------------
@@ -206,20 +183,15 @@ def rotate(angle):
         right_speed = 20
 
     # Main turn
-    left_motor.on_for_degrees(
-        SpeedPercent(left_speed),
-        motor_degrees,
-        block=False
-    )
+    robot = MoveTank(OUTPUT_B, OUTPUT_C)
 
-    right_motor.on_for_degrees(
+    robot.on_for_degrees(
+        SpeedPercent(left_speed),
         SpeedPercent(right_speed),
         motor_degrees,
+        brake=True,
         block=True
     )
-
-    left_motor.off()
-    right_motor.off()
 
     time.sleep(0.2)
 
@@ -239,20 +211,13 @@ def rotate(angle):
             left_speed = -5
             right_speed = 5
 
-        left_motor.on_for_degrees(
+        robot.on_for_degrees(
             SpeedPercent(left_speed),
-            correction_degrees,
-            block=False
-        )
-
-        right_motor.on_for_degrees(
             SpeedPercent(right_speed),
             correction_degrees,
+            brake=True,
             block=True
         )
-
-        left_motor.off()
-        right_motor.off()
 
     # Final result for THIS turn only
     current_angle = gyro.angle - gyro_offset
@@ -262,36 +227,28 @@ def rotate(angle):
     print("Raw gyro angle:", gyro.angle)
     print("Corrected gyro angle:", current_angle)
     print("Final error:", error)
-#rotate(90)
+#rotate(360)
 
 def rectangle(length_cm, width_cm):
-    gyro.reset()
-    time.sleep(1)
     straight(length_cm)
     time.sleep(0.5)
     rotate(90)
     time.sleep(0.5)
 
-    gyro.reset()
-    time.sleep(1)
     straight(width_cm)
     time.sleep(0.5)
     rotate(90)
     time.sleep(0.5)
 
-    gyro.reset()
-    time.sleep(1)
     straight(length_cm)
     time.sleep(0.5)
     rotate(90)
     time.sleep(0.5)
 
-    gyro.reset()
-    time.sleep(1)
     straight(width_cm)
     time.sleep(0.5)
     rotate(90)
-#ectangle(100,50)
+#rectangle(100,50)
 
 # --------------------------------------------------
 # 3.4 LEMNISCATE
