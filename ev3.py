@@ -31,7 +31,7 @@ def straight_line_error():
     left_motor.on(SpeedPercent(-10))
     right_motor.on(SpeedPercent(-10))
 
-    time.sleep(2)
+    time.sleep(1)
 
     left_motor.off()
     right_motor.off()
@@ -92,7 +92,7 @@ def straight(distance_cm):
 
     print("Left motor:", left_motor.position, "degrees")
     print("Right motor:", right_motor.position, "degrees")
-#straight(50)
+#straight(100)
 
 # --------------------------------------------------
 # 3.2 CIRCLE
@@ -371,6 +371,8 @@ def dead_reckoning(commands):
     print("Final right encoder:", right_motor.position)
     # Keep theta between -180 and 180 degrees
     theta = (theta + math.pi) % (2 * math.pi) - math.pi
+    if theta <= -math.pi:
+        theta += 2 * math.pi
 
     print("Estimated x:", x, "cm")
     print("Estimated y:", y, "cm")
@@ -380,8 +382,8 @@ def dead_reckoning(commands):
 # --------------------------------------------------
 # Light sensors
 #
-# Right sensor -> Port 1
-# Left sensor  -> Port 4
+# Right sensor -> Port 4
+# Left sensor  -> Port 1
 # --------------------------------------------------
 # --------------------------------------------------
 # 5.1 COWARDICE
