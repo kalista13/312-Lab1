@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 from ev3dev2.motor import (LargeMotor,OUTPUT_B,OUTPUT_C,SpeedPercent,SpeedDPS,MoveTank)
-from ev3dev2.sensor.lego import GyroSensor, ColorSensor
-from ev3dev2.sensor import INPUT_1, INPUT_2, INPUT_4
+from ev3dev2.sensor.lego import ColorSensor
+from ev3dev2.sensor import INPUT_1, INPUT_4
 
 import time
 import math
@@ -10,38 +10,24 @@ import math
 left_motor = LargeMotor(OUTPUT_B)
 right_motor = LargeMotor(OUTPUT_C)
 
-right_sensor = ColorSensor(INPUT_1)
-left_sensor = ColorSensor(INPUT_4)
-
-gyro = GyroSensor(INPUT_2)
-gyro.mode = 'GYRO-ANG'
-
-gyro.reset()
-time.sleep(0.1)
-
+right_sensor = ColorSensor(INPUT_4)
+left_sensor = ColorSensor(INPUT_1)
 
 # --------------------------------------------------
 # 2. ERROR DATA COLLECTION & ANALYSIS
 #
 # Measure straight-line and rotational error
 # using motor encoders and an independent method.
-#
-# Test multiple motor speeds and compare how
-# motion error changes with speed.
 # --------------------------------------------------
 # --------------------------------------------------
 # 2.1 STRAIGHT-LINE ERROR
 #
 # Measure straight-line motion error.
-#
-# Encoder method:
-# Compare left and right motor rotations.
 # --------------------------------------------------
 def straight_line_error():
     left_motor.position = 0
     right_motor.position = 0
 
-    # Change these values to change speed
     left_motor.on(SpeedPercent(-10))
     right_motor.on(SpeedPercent(-10))
 
@@ -59,9 +45,6 @@ def straight_line_error():
 # 2.2 ROTATION ERROR
 #
 # Measure rotational motion error.
-#
-# Encoder method:
-# Compare wheel rotation during a commanded turn.
 # --------------------------------------------------
 def rotational_error(robot_angle):
     left_motor.position = 0
@@ -86,7 +69,7 @@ def rotational_error(robot_angle):
 # ==================================================
 # 3. SHAPE MOVEMENTS
 #
-# Draw the required trajectories using the pen.
+# Drew the required trajectories using the pen.
 # Repeat each shape from the same starting position.
 # ==================================================
 # --------------------------------------------------
@@ -109,7 +92,7 @@ def straight(distance_cm):
 
     print("Left motor:", left_motor.position, "degrees")
     print("Right motor:", right_motor.position, "degrees")
-#straight(100)
+#straight(50)
 
 # --------------------------------------------------
 # 3.2 CIRCLE
@@ -122,7 +105,7 @@ def circle(radius):
     right_motor.position = 0
 
     wheel_diameter = 5.5
-    wheel_distance = 8.9
+    wheel_distance = 9
 
     d = wheel_distance / 2
 
@@ -146,7 +129,7 @@ def circle(radius):
 
     robot.on_for_degrees(
         SpeedPercent(-left_percent),
-        SpeedPercent(-right_percent),
+        SpeedPercent(-right_percent),                                                                                                                                                                                                                                                                                                                                                                                                       
         left_degrees,
         brake=True,
         block=True
@@ -162,27 +145,16 @@ def circle(radius):
 def rotate(angle):
     wheel_diameter = 5.5
     wheel_distance = 9
-    gyro_offset = 0
 
-    # Reset gyro for every individual turn
-    gyro.reset()
+    motor_degrees = abs(angle) * wheel_distance / wheel_diameter
 
-    # After reset, each turn starts from 0 degrees
-    current_angle = gyro.angle - gyro_offset
-
-    # Amount needed to complete this turn
-    corrected_angle = angle - current_angle
-
-    motor_degrees = abs(corrected_angle) * wheel_distance / wheel_diameter
-
-    if corrected_angle > 0:
+    if angle > 0:
         left_speed = 20
         right_speed = -20
     else:
         left_speed = -20
         right_speed = 20
 
-    # Main turn
     robot = MoveTank(OUTPUT_B, OUTPUT_C)
 
     robot.on_for_degrees(
@@ -193,40 +165,7 @@ def rotate(angle):
         block=True
     )
 
-    time.sleep(0.2)
-
-    # Measure error after the turn
-    current_angle = gyro.angle - gyro_offset
-    error = angle - current_angle
-
-    # Correct remaining error
-    if abs(error) > 1:
-
-        correction_degrees = abs(error) * wheel_distance / wheel_diameter
-
-        if error > 0:
-            left_speed = 5
-            right_speed = -5
-        else:
-            left_speed = -5
-            right_speed = 5
-
-        robot.on_for_degrees(
-            SpeedPercent(left_speed),
-            SpeedPercent(right_speed),
-            correction_degrees,
-            brake=True,
-            block=True
-        )
-
-    # Final result for THIS turn only
-    current_angle = gyro.angle - gyro_offset
-    error = angle - current_angle
-
-    print("Target angle:", angle)
-    print("Raw gyro angle:", gyro.angle)
-    print("Corrected gyro angle:", current_angle)
-    print("Final error:", error)
+    print("Commanded angle:", angle)
 #rotate(360)
 
 def rectangle(length_cm, width_cm):
@@ -254,7 +193,6 @@ def rectangle(length_cm, width_cm):
 # 3.4 LEMNISCATE
 #
 # Move the robot in a figure-eight path.
-# Wheel speeds vary with the trajectory curvature.
 # --------------------------------------------------
 def lemniscate(a=50, total_time=35, dt=0.1, max_dps_per_step=150):
     wheel_diameter = 5.5
@@ -296,7 +234,6 @@ def lemniscate(a=50, total_time=35, dt=0.1, max_dps_per_step=150):
             -(v_right / wheel_circumference) * 360.0
         ))
 
-    # Slew-rate limit: cap how much the commanded speed can change per step
     limited = [dps_list[0]]
     for i in range(1, N):
         prev_l, prev_r = limited[-1]
@@ -321,7 +258,7 @@ def lemniscate(a=50, total_time=35, dt=0.1, max_dps_per_step=150):
     right_motor.off()
     print("Left motor total degrees:", left_motor.position)
     print("Right motor total degrees:", right_motor.position)
-lemniscate()
+#lemniscate()
 
 # --------------------------------------------------
 # 4.1 & 4.2 COMMAND ARRAY / EXECUTION
@@ -330,8 +267,6 @@ lemniscate()
 #
 # Each row contains:
 # [left power, right power, duration]
-#
-# Execute each row sequentially.
 # --------------------------------------------------
 def command_array(commands):
     for row in commands:
@@ -358,15 +293,11 @@ commands = [
 #
 # Estimate the robot pose (x, y, theta)
 # using measured motor encoder velocities.
-#
-# Uses differential-drive kinematics and
-# numerical integration over time.
 # --------------------------------------------------
 def dead_reckoning(commands):
     wheel_diameter = 5.5
     wheel_radius = wheel_diameter / 2
 
-    # In the notes this distance is 2d
     wheel_distance = 9
 
     # Starting pose
@@ -391,7 +322,6 @@ def dead_reckoning(commands):
         right_power = row[1]
         duration = row[2]
 
-        # Execute command
         left_motor.on(SpeedPercent(left_power))
         right_motor.on(SpeedPercent(right_power))
 
@@ -408,7 +338,6 @@ def dead_reckoning(commands):
 
             actual_dt = current_time - previous_time
 
-            # Encoder change
             left_change = current_left - previous_left
             right_change = current_right - previous_right
 
@@ -420,14 +349,11 @@ def dead_reckoning(commands):
             left_velocity = -math.radians(left_dps) * wheel_radius
             right_velocity = -math.radians(right_dps) * wheel_radius
 
-            # Lecture equations
             V = (right_velocity + left_velocity) / 2
 
             omega = (
-                right_velocity - left_velocity
-            ) / wheel_distance
+                right_velocity - left_velocity) / wheel_distance
 
-            # Integrate position using lecture equations
             x = x + V * math.cos(theta) * actual_dt
             y = y + V * math.sin(theta) * actual_dt
             theta = theta + omega * actual_dt
@@ -436,18 +362,19 @@ def dead_reckoning(commands):
             previous_right = current_right
             previous_time = current_time
 
-    left_motor.off()
-    right_motor.off()
+    left_motor.off(brake=True)
+    right_motor.off(brake=True)
 
+    time.sleep(0.5)
+
+    print("Final left encoder:", left_motor.position)
+    print("Final right encoder:", right_motor.position)
     # Keep theta between -180 and 180 degrees
     theta = (theta + math.pi) % (2 * math.pi) - math.pi
 
     print("Estimated x:", x, "cm")
     print("Estimated y:", y, "cm")
     print("Estimated theta:", math.degrees(theta), "degrees")
-da_commands = [
-    [-30, -15, 2]
-]
 #dead_reckoning(commands)
 
 # --------------------------------------------------
@@ -474,15 +401,13 @@ def cowardice():
         left_light = left_sensor.ambient_light_intensity
         right_light = right_sensor.ambient_light_intensity
 
-        # Crossed connections
-        left_speed = right_light
-        right_speed = left_light
+        left_speed = left_light
+        right_speed = right_light
 
         # Limit motor speed
         left_speed = min(left_speed, 50)
         right_speed = min(right_speed, 50)
 
-        # Your robot moves forward with negative speed
         left_motor.on(
             SpeedPercent(-left_speed)
         )
@@ -519,15 +444,13 @@ def aggression():
         left_light = left_sensor.ambient_light_intensity
         right_light = right_sensor.ambient_light_intensity
 
-        # Same-side connections
-        left_speed = left_light
-        right_speed = right_light
+        left_speed = right_light
+        right_speed = left_light
 
         # Limit motor speed
         left_speed = min(left_speed, 50)
         right_speed = min(right_speed, 50)
 
-        # Your robot moves forward with negative speed
         left_motor.on(
             SpeedPercent(-left_speed)
         )
